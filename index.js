@@ -72,7 +72,8 @@ Somfy.prototype = {
             } else {
                 this.log('Opening shutters to %i percent', this.targetPosition);
 
-                let sleepTime = this.movementDuration / 100 * this.targetPosition;
+                let sleepTime = this.movementDuration / 90 * this.targetPosition;
+                this.log('Operation will be stopped after %i seconds', sleepTime);
 
                 let pin = null;
                 if (this.targetPosition > this.currentPosition) {
