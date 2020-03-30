@@ -38,7 +38,7 @@ Somfy.prototype = {
     setTargetPosition: function (position, callback) {
         setTimeout(() => {
             clearInterval(this.interval);
-            this.targetPosition = position !== 0 && position !== 100 ? 0 : position;
+            this.targetPosition = position;
 
             if (this.targetPosition === 100) {
                 this.log('Opening shutters');
@@ -97,7 +97,7 @@ Somfy.prototype = {
                     this.service.getCharacteristic(Characteristic.CurrentPosition).updateValue(this.currentPosition);
                 } else {
 
-                    if (this.intermediatePosition = true) {
+                    if (this.intermediatePosition) {
                         rpio.write(this.pinMyPosition, rpio.LOW);
                         rpio.msleep(this.buttonPressDuration);
                         rpio.write(this.pinMyPosition, rpio.HIGH);
