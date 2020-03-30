@@ -7,7 +7,7 @@ name: CI
 on:
   push:
     tags:
-      - '*'
+      - '1.*'
 
 jobs:
   build:
