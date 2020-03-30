@@ -47,6 +47,7 @@ Somfy.prototype = {
                 rpio.msleep(this.buttonPressDuration);
                 rpio.write(this.pinUp, rpio.HIGH);
 
+                this.intermediatePosition = false;
                 this.positionState = Characteristic.PositionState.DECREASING;
             } else if (this.targetPosition === 10) {
                 this.log('Going to MySomfy position');
@@ -54,6 +55,7 @@ Somfy.prototype = {
                 rpio.write(this.pinMyPosition, rpio.LOW);
                 rpio.msleep(this.buttonPressDuration);
                 rpio.write(this.pinMyPosition, rpio.HIGH);
+                this.intermediatePosition = false;
                 if (this.targetPosition > this.currentPosition) {
                     this.positionState = Characteristic.PositionState.INCREASING;
                 } else {
@@ -65,7 +67,7 @@ Somfy.prototype = {
                 rpio.write(this.pinDown, rpio.LOW);
                 rpio.msleep(this.buttonPressDuration);
                 rpio.write(this.pinDown, rpio.HIGH);
-
+                this.intermediatePosition = false;
                 this.positionState = Characteristic.PositionState.INCREASING;
             } else {
                 this.log('Opening shutters to %i percent', this.targetPosition);
