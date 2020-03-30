@@ -1,0 +1,40 @@
+{
+  "pluginAlias": "Homebridge-somfy-hotwired",
+  "pluginType": "accessory",
+  "schema": {
+    "name": {
+      "title": "Name",
+      "type": "string",
+      "required": true,
+      "default": "Daikin Livingroom"
+    },
+    "pin_up": {
+      "title": "pin_up",
+      "description": "The RPIO pin you used to connect to the remote",
+      "type": "string",
+      "required": true,
+      "default": "3"
+    },
+    "pin_down": {
+      "title": "pin_down",
+      "description": "The RPIO pin you used to connect to the remote",
+      "type": "string",
+      "required": true,
+      "default": "5"
+    },
+    "pin_my_position": {
+      "title": "pin_my_position",
+      "description": "The RPIO pin you used to connect to the remote",
+      "type": "string",
+      "required": true,
+      "default": "7"
+    },
+    "movement_duration": {
+      "title": "movement_duration",
+      "description": "The 'average' time it takes for a full operation (up -> down)",
+      "type": "string",
+      "required": true,
+      "default": "10"
+    }
+  }
+}
