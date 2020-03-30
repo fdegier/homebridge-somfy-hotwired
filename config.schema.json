@@ -1,12 +1,12 @@
 {
-  "pluginAlias": "Homebridge-somfy-hotwired",
+  "pluginAlias": "Homebridge-somfy-hotwire",
   "pluginType": "accessory",
   "schema": {
     "name": {
       "title": "Name",
       "type": "string",
       "required": true,
-      "default": "Daikin Livingroom"
+      "default": "Shutter"
     },
     "pin_up": {
       "title": "pin_up",
