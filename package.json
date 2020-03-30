@@ -21,7 +21,7 @@
     "homebridge",
     "somfy"
   ],
-  "license": "The Unlicense",
+  "license": "Unlicense",
   "engines": {
     "node": ">=8.15.1",
     "homebridge": ">=0.4.50"
