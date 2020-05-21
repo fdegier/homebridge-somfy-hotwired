@@ -1,5 +1,5 @@
 ![CI](https://github.com/F4stFr3ddy/homebridge-somfy-hotwired/workflows/CI/badge.svg)
-[![npm version](https://badge.fury.io/js/homebridge-somfy-hotwire.svg)](https://badge.fury.io/js/homebridge-somfy-hotwire)
+[![npm version](https://badge.fury.io/js/homebridge-somfy-hotwired.svg)](https://badge.fury.io/js/homebridge-somfy-hotwire)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
 # homebridge-somfy-hotwired
 If you have a Somfy Telis 1 RTS you can wire it your Raspberry Pi and control all of the buttons remotely. Since it 
