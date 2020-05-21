@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "Homebridge-somfy-hotwire",
+  "pluginAlias": "Homebridge-somfy-hotwired",
   "pluginType": "accessory",
   "schema": {
     "name": {
