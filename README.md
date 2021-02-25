@@ -17,7 +17,7 @@ Simplest would be if you have a case to put the board of the remote it.
 5. Solder all of these male ends to the board and plug the female side onto te GPIO
 
 It should look somewhat like this:
-![hotwired](hotwired.jpeg)
+![hotwired](hotwired_1.jpeg)
 ![hotwired2](hotwired_2.jpeg)
 ![hotwired3](hotwired_3.jpeg)
 
