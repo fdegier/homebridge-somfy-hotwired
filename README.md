@@ -17,6 +17,8 @@ Simplest would be if you have a case to put the board of the remote it.
 
 It should look somewhat like this:
 ![hotwired](hotwired.jpeg)
+![hotwired2](hotwired_2.jpeg)
+![hotwired3](hotwired_3.jpeg)
 
 No you are ready to go, either use the UI config or add the config manually.
 
