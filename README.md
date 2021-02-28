@@ -34,6 +34,7 @@ Sample of the config used in the README. Movement duration is best measured as t
     "pin_down": "5",
     "pin_my_position": "7",
     "movement_duration": "11",
-    "accessory": "Homebridge-somfy-hotwired"
+    "accessory": "Homebridge-somfy-hotwired",
+    "default_position: "up"
 }
 ```
