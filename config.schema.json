@@ -35,6 +35,27 @@
       "type": "string",
       "required": true,
       "default": "10"
+    },
+    "default_position": {
+      "title": "default_position",
+      "description": "When Homebridge restarts, should the shutter de displayed as up or down?",
+      "type": "string",
+      "required": true,
+      "default": "up",
+      "oneOf": [
+        {
+          "title": "Up",
+          "enum": [
+            "up"
+          ]
+        },
+        {
+          "title": "Down",
+          "enum": [
+            "down"
+          ]
+        }
+      ]
     }
   }
 }

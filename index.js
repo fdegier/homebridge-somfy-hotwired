@@ -11,9 +11,14 @@ module.exports = function (homebridge) {
 function Somfy(log, config) {
     this.service = new Service.WindowCovering(this.name);
     this.log = log;
+    if (config.currentPosition === "up") {
+        this.currentPosition = 100;
+        this.targetPosition = 100;
+    } else {
+        this.currentPosition = 0;
+        this.targetPosition = 0;
+    }
 
-    this.currentPosition = 100;
-    this.targetPosition = 100;
     this.buttonPressDuration = 500;
 
     this.positionState = Characteristic.PositionState.STOPPED;
