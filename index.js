@@ -11,7 +11,7 @@ module.exports = function (homebridge) {
 function Somfy(log, config) {
     this.service = new Service.WindowCovering(this.name);
     this.log = log;
-    if (config.currentPosition === "up") {
+    if (config.default_position === "up") {
         this.currentPosition = 100;
         this.targetPosition = 100;
     } else {
