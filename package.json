@@ -28,5 +28,9 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "funding": {
+      "type": "kofi",
+      "url": "https://www.ko-fi.com/fdegier"
   }
 }
