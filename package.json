@@ -1,16 +1,16 @@
 {
   "name": "homebridge-somfy-hotwired",
   "version": "1.2.1",
-  "homepage": "https://github.com/F4stFr3ddy/homebridge-somfy-hotwired#readme",
+  "homepage": "https://github.com/fdegier/homebridge-somfy-hotwired#readme",
   "description": "Control Somfy remotes with Homebridge",
   "author": "F. de Gier",
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/F4stFr3ddy/homebridge-somfy-hotwired.git"
+    "url": "git+https://github.com/fdegier/homebridge-somfy-hotwired.git"
   },
   "bugs": {
-    "url": "https://github.com/F4stFr3ddy/homebridge-somfy-hotwired/issues"
+    "url": "https://github.com/fdegier/homebridge-somfy-hotwired/issues"
   },
   "dependencies": {
     "rpio": "^1.0.11"
