@@ -1,4 +1,4 @@
-![CI](https://github.com/F4stFr3ddy/homebridge-somfy-hotwired/workflows/CI/badge.svg)
+![CI](https://github.com/fdegier/homebridge-somfy-hotwired/workflows/CI/badge.svg)
 [![npm version](https://badge.fury.io/js/homebridge-somfy-hotwired.svg)](https://badge.fury.io/js/homebridge-somfy-hotwired)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
 [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
@@ -9,7 +9,7 @@ requires soldering and some cables, I like to call it hotwiring your Somfy :).
 You do need a remote that is already programmed to work with your shutter.
 
 ## Hotwiring
-Simplest would be if you have a case to put the board of the remote it.
+Simplest would be if you have a case to put the board of the remote in.
 1. Remove the casing and battery
 2. Get 5 jumpwires (female to male)
 3. I like to use pins 1 and 9 for the power
