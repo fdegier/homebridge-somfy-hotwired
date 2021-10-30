@@ -1,4 +1,4 @@
-![CI](https://github.com/F4stFr3ddy/homebridge-somfy-hotwired/workflows/CI/badge.svg)
+![CI](https://github.com/fdegier/homebridge-somfy-hotwired/workflows/CI/badge.svg)
 [![npm version](https://badge.fury.io/js/homebridge-somfy-hotwired.svg)](https://badge.fury.io/js/homebridge-somfy-hotwired)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
 [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
