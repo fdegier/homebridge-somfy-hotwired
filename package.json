@@ -13,7 +13,7 @@
     "url": "https://github.com/fdegier/homebridge-somfy-hotwired/issues"
   },
   "dependencies": {
-    "rpio": "^1.0.11"
+    "rpio": "^2.4.2"
   },
   "keywords": [
     "homebridge-plugin",
