@@ -23,7 +23,7 @@
   ],
   "license": "Unlicense",
   "engines": {
-    "node": ">=8.15.1",
+    "node": ">=8.15.1 <=24",
     "homebridge": ">=0.4.50"
   },
   "scripts": {
