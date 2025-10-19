@@ -24,6 +24,18 @@ It should look somewhat like this:
 No you are ready to go, either use the UI config or add the config manually.
 
 ## Config
+
+### Important: GPIO Pin Numbering
+
+This plugin uses **BCM GPIO numbering**, not physical pin numbers. Here's the mapping:
+
+| Physical Pin | BCM GPIO | Purpose |
+|-------------|----------|---------|
+| Pin 11 | GPIO 17 | Up button |
+| Pin 13 | GPIO 27 | My/Stop button |
+| Pin 15 | GPIO 22 | Down button |
+
+
 Sample of the config used in the README. Movement duration is best measured as the time it takes to move from up to 
 `MySomfy` position in seconds, you can adjust it to your liking. 
 

@@ -1,197 +1,233 @@
-// Homebridge Somfy Hotwired — Node 22 & Pi 5 compatible rewrite
-// F. de Gier — 2025
+'use strict';
 
-// Lazy-load GPIO for Linux ARM devices; fallback mock for dev / Docker
-let gpiox = null;
+const packageJSON = require('./package.json');
+let Gpio = null;
 let gpioAvailable = false;
-if (process.platform === "linux" && (process.arch === "arm" || process.arch === "arm64")) {
-  try {
-    gpiox = require("@iiot2k/gpiox");
-    gpioAvailable = true;
-    console.log("[Somfy] GPIOX loaded successfully");
-  } catch (err) {
-    console.warn("[Somfy] ⚠️ Failed to load @iiot2k/gpiox, running in mock mode:", err.message);
-  }
-}
 
-class MockGpio {
-  write() {}
-  close() {}
-}
-
-function makeGpio(pin, direction = "out") {
-  if (!gpioAvailable) return new MockGpio();
-  try {
-    return gpiox.gpio(pin, direction);
-  } catch (err) {
-    console.warn(`[Somfy] ⚠️ Failed to initialize GPIO pin ${pin}: ${err.message}`);
-    return new MockGpio();
-  }
+// Try to load onoff
+try {
+  const onoff = require('onoff');
+  Gpio = onoff.Gpio;
+  gpioAvailable = Gpio.accessible;
+  console.log('[Somfy] GPIO initialized, accessible:', gpioAvailable);
+} catch (err) {
+  console.warn('[Somfy] ⚠️ GPIO load failed, running in mock mode:', err.message);
 }
 
 let Service, Characteristic;
 
-module.exports = function (homebridge) {
+module.exports = (homebridge) => {
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
   homebridge.registerAccessory("homebridge-somfy-hotwired", "Homebridge-somfy-hotwired", Somfy);
 };
 
-function Somfy(log, config) {
-  this.log = log;
-  this.name = config.name || "Somfy Hotwired";
-  this.service = new Service.WindowCovering(this.name);
+class Somfy {
+  constructor(log, config) {
+    this.log = log;
+    this.name = config.name || 'Somfy Curtain';
+    
+    // Read from snake_case config
+    this.pinUp = config.pin_up;
+    this.pinDown = config.pin_down;
+    this.pinMyPosition = config.pin_my_position;
+    this.movementDuration = config.movement_duration || 8; // in seconds
+    this.buttonPressDuration = 500; // ms
 
-  // Default positions
-  if (config.default_position === "up") {
-    this.currentPosition = 100;
-    this.targetPosition = 100;
-  } else {
-    this.currentPosition = 0;
-    this.targetPosition = 0;
+    // Initialize position based on default_position
+    if (config.default_position === "up") {
+      this.currentPosition = 100;
+      this.targetPosition = 100;
+    } else {
+      this.currentPosition = 0;
+      this.targetPosition = 0;
+    }
+
+    this.positionState = 2; // stopped
+    this.intermediatePosition = false;
+    this.interval = null;
+
+    // Initialize GPIO pins using onoff
+    this.gpioUp = null;
+    this.gpioDown = null;
+    this.gpioMyPosition = null;
+
+    if (gpioAvailable && Gpio) {
+      try {
+        this.gpioUp = new Gpio(this.pinUp, 'out');
+        this.gpioDown = new Gpio(this.pinDown, 'out');
+        this.gpioMyPosition = new Gpio(this.pinMyPosition, 'out');
+        
+        // Set all to HIGH (idle)
+        this.gpioUp.writeSync(1);
+        this.gpioDown.writeSync(1);
+        this.gpioMyPosition.writeSync(1);
+        
+        this.log.info(`[Somfy] GPIO pins initialized - Up:${this.pinUp}, Down:${this.pinDown}, My:${this.pinMyPosition}`);
+      } catch (err) {
+        this.log.error(`[Somfy] Failed to initialize GPIO pins: ${err.message}`);
+        gpioAvailable = false;
+      }
+    } else {
+      this.log.warn('[Somfy] GPIO not accessible - running in mock mode');
+    }
+
+    this.service = new Service.WindowCovering(this.name);
+    this.service
+      .getCharacteristic(Characteristic.CurrentPosition)
+      .on('get', this.getCurrentPosition.bind(this));
+    this.service
+      .getCharacteristic(Characteristic.PositionState)
+      .on('get', this.getPositionState.bind(this));
+    
+    const targetPositionChar = this.service.getCharacteristic(Characteristic.TargetPosition);
+    targetPositionChar.setProps({
+      format: Characteristic.Formats.UINT8,
+      unit: Characteristic.Units.PERCENTAGE,
+      maxValue: 100,
+      minValue: 0,
+      minStep: 10,
+      perms: [Characteristic.Perms.READ, Characteristic.Perms.WRITE, Characteristic.Perms.NOTIFY]
+    });
+    targetPositionChar
+      .on('get', this.getTargetPosition.bind(this))
+      .on('set', this.setTargetPosition.bind(this));
+
+    // Cleanup on exit
+    process.on('SIGINT', () => this.cleanup());
+    process.on('SIGTERM', () => this.cleanup());
+
+    this.log.info(`[Somfy] Initialized "${this.name}" - Current position: ${this.currentPosition}%`);
   }
 
-  this.positionState = Characteristic.PositionState.STOPPED;
-  this.buttonPressDuration = config.button_press_duration || 500;
-  this.movementDuration = config.movement_duration || 20; // seconds
-
-  // GPIO pin config
-  this.pinUp = config.pin_up;
-  this.pinDown = config.pin_down;
-  this.pinMyPosition = config.pin_my_position;
-
-  // Initialize GPIOs
-  this.gpioUp = makeGpio(this.pinUp);
-  this.gpioDown = makeGpio(this.pinDown);
-  this.gpioMyPosition = makeGpio(this.pinMyPosition);
-
-  // Set all to HIGH (inactive)
-  this.gpioUp.write(1);
-  this.gpioDown.write(1);
-  this.gpioMyPosition.write(1);
-
-  // Track pending timeouts to avoid race conditions
-  this.pendingTimeouts = { up: null, down: null, myPosition: null };
-
-  // Cleanup on shutdown
-  process.on("SIGINT", () => {
+  cleanup() {
     try {
-      this.gpioUp?.close();
-      this.gpioDown?.close();
-      this.gpioMyPosition?.close();
+      if (this.gpioUp) this.gpioUp.unexport();
+      if (this.gpioDown) this.gpioDown.unexport();
+      if (this.gpioMyPosition) this.gpioMyPosition.unexport();
     } catch (err) {
-      this.log("GPIO close error:", err.message);
+      // Ignore cleanup errors
     }
-    process.exit();
-  });
-}
+  }
 
-// Helper function: press GPIO button safely
-Somfy.prototype.pressButton = function (gpio, pinName, duration) {
-  if (this.pendingTimeouts[pinName]) clearTimeout(this.pendingTimeouts[pinName]);
-  gpio.write(0);
-  this.pendingTimeouts[pinName] = setTimeout(() => {
-    gpio.write(1);
-    this.pendingTimeouts[pinName] = null;
-  }, duration);
-};
-
-Somfy.prototype = {
   getCurrentPosition(callback) {
     callback(null, this.currentPosition);
-  },
+  }
 
   getTargetPosition(callback) {
     callback(null, this.targetPosition);
-  },
-
-  setTargetPosition(position, callback) {
-    this.targetPosition = position;
-    this.log(`Target position set to ${position}%`);
-
-    clearInterval(this.interval);
-
-    if (this.targetPosition === 100) {
-      this.log("Opening shutters");
-      this.pressButton(this.gpioUp, "up", this.buttonPressDuration);
-      this.positionState = Characteristic.PositionState.DECREASING;
-    } else if (this.targetPosition === 10) {
-      this.log("Going to MySomfy position");
-      this.pressButton(this.gpioMyPosition, "myPosition", this.buttonPressDuration);
-      this.positionState =
-        this.targetPosition > this.currentPosition
-          ? Characteristic.PositionState.INCREASING
-          : Characteristic.PositionState.DECREASING;
-    } else if (this.targetPosition === 0) {
-      this.log("Closing shutters");
-      this.pressButton(this.gpioDown, "down", this.buttonPressDuration);
-      this.positionState = Characteristic.PositionState.INCREASING;
-    } else {
-      this.log(`Moving shutters to ${this.targetPosition}%`);
-      const moveTime = (this.movementDuration / 90) * this.targetPosition;
-      this.log(`Movement duration: ${moveTime}s`);
-      const pin = this.targetPosition > this.currentPosition ? "up" : "down";
-      const gpio = pin === "up" ? this.gpioUp : this.gpioDown;
-      this.pressButton(gpio, pin, this.buttonPressDuration);
-      this.positionState = Characteristic.PositionState.INCREASING;
-    }
-
-    // Update current position gradually
-    this.interval = setInterval(() => {
-      if (this.currentPosition !== this.targetPosition) {
-        if (this.targetPosition > this.currentPosition) this.currentPosition += 10;
-        else this.currentPosition -= 10;
-        this.service
-          .getCharacteristic(Characteristic.CurrentPosition)
-          .updateValue(this.currentPosition);
-      } else {
-        this.log("Operation complete");
-        this.positionState = Characteristic.PositionState.STOPPED;
-        this.service
-          .getCharacteristic(Characteristic.PositionState)
-          .updateValue(this.positionState);
-        clearInterval(this.interval);
-      }
-    }, this.movementDuration * 100);
-
-    callback(null);
-  },
+  }
 
   getPositionState(callback) {
     callback(null, this.positionState);
-  },
+  }
+
+  setTargetPosition(value, callback) {
+    this.log.info(`[Somfy] Setting target position to ${value}% (current: ${this.currentPosition}%)`);
+
+    setTimeout(() => {
+      if (this.interval) {
+        clearInterval(this.interval);
+      }
+
+      this.targetPosition = value;
+
+      if (this.targetPosition === 100) {
+        this.log.info('[Somfy] Opening shutters');
+        this.pressButton(this.gpioUp, this.pinUp, 'UP');
+        this.intermediatePosition = false;
+        this.positionState = 1; // INCREASING
+        this.updatePositionState();
+        this.startPositionTracking();
+      } else if (this.targetPosition === 10) {
+        this.log.info('[Somfy] Going to MySomfy position');
+        this.pressButton(this.gpioMyPosition, this.pinMyPosition, 'MY');
+        this.intermediatePosition = false;
+        this.positionState = this.targetPosition > this.currentPosition ? 1 : 0;
+        this.updatePositionState();
+        this.startPositionTracking();
+      } else if (this.targetPosition === 0) {
+        this.log.info('[Somfy] Closing shutters');
+        this.pressButton(this.gpioDown, this.pinDown, 'DOWN');
+        this.intermediatePosition = false;
+        this.positionState = 0; // DECREASING
+        this.updatePositionState();
+        this.startPositionTracking();
+      } else {
+        this.log.info(`[Somfy] Moving to intermediate position ${this.targetPosition}%`);
+        
+        const gpio = this.targetPosition > this.currentPosition ? this.gpioUp : this.gpioDown;
+        const pin = this.targetPosition > this.currentPosition ? this.pinUp : this.pinDown;
+        const pinName = this.targetPosition > this.currentPosition ? 'UP' : 'DOWN';
+        
+        this.pressButton(gpio, pin, pinName);
+        this.intermediatePosition = true;
+        this.positionState = this.targetPosition > this.currentPosition ? 1 : 0;
+        this.updatePositionState();
+        this.startPositionTracking();
+      }
+    }, 0);
+
+    callback();
+  }
+
+  startPositionTracking() {
+    this.interval = setInterval(() => {
+      if (this.currentPosition !== this.targetPosition) {
+        if (this.targetPosition > this.currentPosition) {
+          this.currentPosition += 10;
+        } else {
+          this.currentPosition -= 10;
+        }
+        this.log.info(`[Somfy] Position update: ${this.currentPosition}%`);
+        this.service.getCharacteristic(Characteristic.CurrentPosition).updateValue(this.currentPosition);
+      } else {
+        // Target reached
+        if (this.intermediatePosition) {
+          this.log.info('[Somfy] Stopping at intermediate position');
+          this.pressButton(this.gpioMyPosition, this.pinMyPosition, 'MY (STOP)');
+        }
+
+        this.log.info('[Somfy] Operation completed!');
+        this.positionState = 2; // STOPPED
+        this.service.getCharacteristic(Characteristic.PositionState).updateValue(this.positionState);
+        clearInterval(this.interval);
+        this.interval = null;
+      }
+    }, this.movementDuration * 100); // Convert seconds to ms, then divide by 10 steps
+  }
+
+  pressButton(gpio, pin, pinName) {
+    if (!gpioAvailable || !gpio) {
+      this.log.warn(`[Somfy] GPIO not available, cannot press ${pinName}`);
+      return;
+    }
+
+    try {
+      this.log.info(`[Somfy] Pressing button ${pinName} on GPIO pin ${pin}`);
+      gpio.writeSync(0); // Active LOW
+      
+      setTimeout(() => {
+        gpio.writeSync(1); // Back to HIGH
+        this.log.info(`[Somfy] Button ${pinName} released`);
+      }, this.buttonPressDuration);
+    } catch (err) {
+      this.log.error(`[Somfy] Error pressing button ${pinName}: ${err.message}`);
+    }
+  }
+
+  updatePositionState() {
+    this.service.updateCharacteristic(Characteristic.PositionState, this.positionState);
+    this.service.updateCharacteristic(Characteristic.CurrentPosition, this.currentPosition);
+  }
 
   getServices() {
-    const informationService = new Service.AccessoryInformation()
-      .setCharacteristic(Characteristic.Manufacturer, "Somfy")
-      .setCharacteristic(Characteristic.Model, "Telis 1 RTS")
-      .setCharacteristic(Characteristic.SerialNumber, "1337");
-
-    this.service
-      .getCharacteristic(Characteristic.CurrentPosition)
-      .on("get", this.getCurrentPosition.bind(this));
-
-    this.service
-      .getCharacteristic(Characteristic.TargetPosition)
-      .setProps({
-        format: Characteristic.Formats.UINT8,
-        unit: Characteristic.Units.PERCENTAGE,
-        maxValue: 100,
-        minValue: 0,
-        minStep: 10,
-        perms: [
-          Characteristic.Perms.READ,
-          Characteristic.Perms.WRITE,
-          Characteristic.Perms.NOTIFY,
-        ],
-      })
-      .on("get", this.getTargetPosition.bind(this))
-      .on("set", this.setTargetPosition.bind(this));
-
-    this.service
-      .getCharacteristic(Characteristic.PositionState)
-      .on("get", this.getPositionState.bind(this));
+    const informationService = new Service.AccessoryInformation();
+    informationService
+      .setCharacteristic(Characteristic.Manufacturer, 'Somfy')
+      .setCharacteristic(Characteristic.Model, 'Telis 1 RTS')
+      .setCharacteristic(Characteristic.SerialNumber, packageJSON.version);
 
     return [informationService, this.service];
-  },
-};
+  }
+}
