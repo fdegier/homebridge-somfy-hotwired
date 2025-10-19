@@ -1,6 +1,6 @@
 {
   "name": "homebridge-somfy-hotwired",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "homepage": "https://github.com/fdegier/homebridge-somfy-hotwired#readme",
   "description": "Control Somfy remotes with Homebridge",
   "author": "F. de Gier",
@@ -13,13 +13,15 @@
     "url": "https://github.com/fdegier/homebridge-somfy-hotwired/issues"
   },
   "dependencies": {
-    "pigpio": "^3.3.1"
+    "@iiot2k/gpiox": "^2.1.3"
   },
   "keywords": [
     "homebridge-plugin",
     "homebridge somfy",
     "homebridge",
-    "somfy"
+    "somfy",
+    "gpio",
+    "raspberrypi"
   ],
   "license": "Unlicense",
   "engines": {
@@ -30,7 +32,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "funding": {
-      "type": "kofi",
-      "url": "https://www.ko-fi.com/fdegier"
+    "type": "kofi",
+    "url": "https://www.ko-fi.com/fdegier"
   }
 }
