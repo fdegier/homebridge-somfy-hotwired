@@ -1,4 +1,20 @@
-const rpio = require('rpio');
+// Lazy GPIO: only load on Linux ARM devices; otherwise use a no-op mock so
+// the plugin can load in Docker and on dev machines without Raspberry Pi GPIO
+let Gpio = null;
+let gpioAvailable = false;
+if (process.platform === 'linux' && (process.arch === 'arm' || process.arch === 'arm64')) {
+    try {
+        Gpio = require('pigpio').Gpio;
+        gpioAvailable = true;
+    } catch (err) {
+        // fall through to mock
+    }
+}
+
+class MockGpio {
+    constructor() {}
+    digitalWrite() {}
+}
 
 let Service, Characteristic;
 
@@ -28,10 +44,61 @@ function Somfy(log, config) {
     this.pinMyPosition = config['pin_my_position'];
     this.movementDuration = config['movement_duration'];
 
-    rpio.open(this.pinUp, rpio.OUTPUT, rpio.HIGH);
-    rpio.open(this.pinDown, rpio.OUTPUT, rpio.HIGH);
-    rpio.open(this.pinMyPosition, rpio.OUTPUT, rpio.HIGH);
+    const GpioImpl = gpioAvailable ? Gpio : MockGpio;
+    if (!gpioAvailable) {
+        this.log('GPIO not available on this platform; running in no-op mode.');
+    }
+    const modeOpt = gpioAvailable ? { mode: Gpio.OUTPUT } : {};
+    
+    try {
+        this.gpioUp = new GpioImpl(this.pinUp, modeOpt);
+    } catch (err) {
+        this.log('Failed to initialize gpioUp, falling back to MockGpio:', err.message);
+        this.gpioUp = new MockGpio();
+    }
+    
+    try {
+        this.gpioDown = new GpioImpl(this.pinDown, modeOpt);
+    } catch (err) {
+        this.log('Failed to initialize gpioDown, falling back to MockGpio:', err.message);
+        this.gpioDown = new MockGpio();
+    }
+    
+    try {
+        this.gpioMyPosition = new GpioImpl(this.pinMyPosition, modeOpt);
+    } catch (err) {
+        this.log('Failed to initialize gpioMyPosition, falling back to MockGpio:', err.message);
+        this.gpioMyPosition = new MockGpio();
+    }
+
+    this.gpioUp.digitalWrite(1);
+    this.gpioDown.digitalWrite(1);
+    this.gpioMyPosition.digitalWrite(1);
+    
+    // Store pending timeouts to prevent race conditions
+    this.pendingTimeouts = {
+        up: null,
+        down: null,
+        myPosition: null
+    };
 }
+
+// Helper function to press a GPIO button with race condition protection
+Somfy.prototype.pressButton = function(gpio, pinName, duration) {
+    // Clear any pending timeout for this pin
+    if (this.pendingTimeouts[pinName]) {
+        clearTimeout(this.pendingTimeouts[pinName]);
+    }
+    
+    // Press button (LOW)
+    gpio.digitalWrite(0);
+    
+    // Schedule release (HIGH) after duration
+    this.pendingTimeouts[pinName] = setTimeout(() => {
+        gpio.digitalWrite(1);
+        this.pendingTimeouts[pinName] = null;
+    }, duration);
+};
 
 Somfy.prototype = {
     getCurrentPosition: function (callback) {
@@ -48,18 +115,14 @@ Somfy.prototype = {
             if (this.targetPosition === 100) {
                 this.log('Opening shutters');
 
-                rpio.write(this.pinUp, rpio.LOW);
-                rpio.msleep(this.buttonPressDuration);
-                rpio.write(this.pinUp, rpio.HIGH);
+                this.pressButton(this.gpioUp, 'up', this.buttonPressDuration);
 
                 this.intermediatePosition = false;
                 this.positionState = Characteristic.PositionState.DECREASING;
             } else if (this.targetPosition === 10) {
                 this.log('Going to MySomfy position');
 
-                rpio.write(this.pinMyPosition, rpio.LOW);
-                rpio.msleep(this.buttonPressDuration);
-                rpio.write(this.pinMyPosition, rpio.HIGH);
+                this.pressButton(this.gpioMyPosition, 'myPosition', this.buttonPressDuration);
                 this.intermediatePosition = false;
                 if (this.targetPosition > this.currentPosition) {
                     this.positionState = Characteristic.PositionState.INCREASING;
@@ -69,9 +132,7 @@ Somfy.prototype = {
             } else if (this.targetPosition === 0) {
                 this.log('Closing shutters');
 
-                rpio.write(this.pinDown, rpio.LOW);
-                rpio.msleep(this.buttonPressDuration);
-                rpio.write(this.pinDown, rpio.HIGH);
+                this.pressButton(this.gpioDown, 'down', this.buttonPressDuration);
                 this.intermediatePosition = false;
                 this.positionState = Characteristic.PositionState.INCREASING;
             } else {
@@ -87,9 +148,11 @@ Somfy.prototype = {
                     pin = this.pinDown
                 }
 
-                rpio.write(pin, rpio.LOW);
-                rpio.msleep(this.buttonPressDuration);
-                rpio.write(pin, rpio.HIGH);
+                if (pin === this.pinUp) {
+                    this.pressButton(this.gpioUp, 'up', this.buttonPressDuration);
+                } else {
+                    this.pressButton(this.gpioDown, 'down', this.buttonPressDuration);
+                }
 
                 this.intermediatePosition = true;
                 this.positionState = Characteristic.PositionState.INCREASING;
@@ -106,9 +169,7 @@ Somfy.prototype = {
                 } else {
 
                     if (this.intermediatePosition) {
-                        rpio.write(this.pinMyPosition, rpio.LOW);
-                        rpio.msleep(this.buttonPressDuration);
-                        rpio.write(this.pinMyPosition, rpio.HIGH);
+                        this.pressButton(this.gpioMyPosition, 'myPosition', this.buttonPressDuration);
                     }
 
                     this.log('Operation completed!');
